@@ -1,0 +1,12 @@
+*.o
+*.s
+system
+kernel.bin
+tags
+boot
+*.img
+.ccls-cache
+*.map
+serial.txt
+*.bin
+*.elf

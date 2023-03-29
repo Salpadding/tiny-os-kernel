@@ -1,0 +1,52 @@
+#ifndef __BIOS_CALL_H
+#define __BIOS_CALL_H
+#include <eflags.h>
+
+// 这个函数通常会在循环里被调用
+// 禁用内联优化防止 eax, ecx, edx 被覆盖
+static int  __attribute__((noinline)) e820_call (void* dst, unsigned long *ebx) {
+    unsigned long eflags;
+    asm volatile(
+        "movl %1, %%ebx\n\t"
+        "int $0x15\n\t"
+        "pushfl\n\t"
+        "popl %0\n\t"
+        "movl %%ebx, %1\n\t"
+        :"=r"(eflags), "+m"(*ebx)
+        :"c" (20), "d" (0x534d4150) , "a"(0xe820),
+       "D" ((unsigned long) dst)
+        : "memory", "%ebx"
+    );
+    if (eflags & EFLAGS_CF ) {
+        return -1;
+    }
+    return 0;
+}
+
+struct __attribute__((packed)) disk_address_packet {
+    unsigned short magic;
+    unsigned short count;
+    unsigned short address;
+    unsigned short page;
+    unsigned long lba_low;
+    unsigned long lba_high;
+};
+
+static int __attribute__((noinline)) bios_read_secs(unsigned long lba, struct disk_address_packet* dap) {
+    unsigned long eflags;
+    asm volatile (
+        "int $0x13\n\t" 
+        "pushfl\n\t"
+        "popl %0\n\t"
+        :
+        "=r"(eflags) :
+        "d"(0x80), "S"((unsigned long)dap), "a" (0x4200)
+    );
+
+    if (eflags & 1) {
+        return -1;
+    } 
+    return 0;
+}
+
+#endif
