@@ -3,11 +3,37 @@
 #include <serial.h>
 #include <bios_call.h>
 
+struct disk_address_packet dap __align(ALIGN_DESC) = { 
+    .dap_size = 0x10,
+    .count = 0,
+    .address = 0,
+    .segment = 0,
+    .lba_low = 0,
+    .lba_high = 0,
+};
+
+// 跨段复制
+static void __noinline cp(unsigned long dst, unsigned long src, unsigned long count) {
+    asm volatile(
+        "pushl %%ds\n\t"
+        "pushl %%es\n\t"
+        "mov %0, %%es\n\t"
+        "mov %1, %%ds\n\t"
+        "rep movsb\n\t"
+        "popl  %%es\n\t"
+        "popl  %%ds\n\t" :: 
+        "r"( (dst >> 4) & 0xf000 ), 
+        "r" ( (src >> 4) & 0xf000), 
+        "c" (count), 
+        "S"((unsigned long)src & 0xffff), 
+        "D"((unsigned long)dst & 0xffff):
+    );
+}
 
 tb_desc_t  gdt[3]  __align(ALIGN_DESC) = {
-    [0] = { .lower = 0, .upper = 0 },
-    [1] = { .lower = 0x0000FFFF, .upper = 0x00CF9A00},
-    [2] = { .lower = 0x0000FFFF, .upper = 0x00CF9200},
+    [0] =  0,
+    [1] = 0x00CF9A0000000000 ,
+    [2] = 0x00CF920000000000,
 };
 
 tb_ptr_t  gdt_ptr __align(ALIGN_DESC) = {
@@ -15,23 +41,38 @@ tb_ptr_t  gdt_ptr __align(ALIGN_DESC) = {
     .addr = &gdt, 
 };
 
+#define SECS_PER_READ 4
+static char cp_buf[SECS_PER_READ * SEC_SIZE];
+
 // __entry 配合 linker script
 // 强制把_start 里面的代码放到程序开头
 void __entry _start() {
     cli();
+    unsigned i, code = 0 ;
 
-    // 复位栈指针
-    asm volatile(
-    "movl $0x9000, %eax\n\t"
-    "movl %eax, %esp\n\t"
-    "movl %eax, %ebp\n\t"
-    );
+    #define BUF_ADDR (unsigned long)(&cp_buf[0])
+    // 先读到 buffer 
+    // 再跨段从 buffer copy 到 0x10000
+    for(i = 0; i < KERNEL_SECS / SECS_PER_READ; i++) {
+        dap.lba_low = i * SECS_PER_READ + 1 + LOADER_SECS;
+        dap.address = BUF_ADDR;
+        dap.count = SECS_PER_READ;
+        code = bios_read_secs(&dap);
+
+        cp(KERNEL_TMP + i * SECS_PER_READ * SEC_SIZE, BUF_ADDR, SECS_PER_READ *SEC_SIZE);
+
+        if (code < 0) {
+            puts("read sectors by bios call failed\n");
+            while(1);
+        }
+    }
 
     puts("ready for detect memory map\n");
 
-    int code = 0 ;
     unsigned long ebx = 0;
     void* dst = (void*) E820_MAP_ADDR;
+    u16* e820_cnt = E820_MAP_LEN;
+    *e820_cnt = 0;
     unsigned long cr0;
 
     // 查询 e820 map
@@ -49,6 +90,7 @@ void __entry _start() {
              while(1);
         }
         
+        (*e820_cnt)++;
     }
 
     // 开启 a20

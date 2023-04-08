@@ -10,3 +10,4 @@ boot
 serial.txt
 *.bin
 *.elf
+.git

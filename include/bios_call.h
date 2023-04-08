@@ -1,6 +1,7 @@
 #ifndef __BIOS_CALL_H
 #define __BIOS_CALL_H
 #include <eflags.h>
+#include <types.h>
 
 // 这个函数通常会在循环里被调用
 // 禁用内联优化防止 eax, ecx, edx 被覆盖
@@ -23,16 +24,16 @@ static int  __attribute__((noinline)) e820_call (void* dst, unsigned long *ebx) 
     return 0;
 }
 
-struct __attribute__((packed)) disk_address_packet {
-    unsigned short magic;
+struct __pack disk_address_packet {
+    unsigned short dap_size;
     unsigned short count;
     unsigned short address;
-    unsigned short page;
+    unsigned short segment;
     unsigned long lba_low;
     unsigned long lba_high;
 };
 
-static int __attribute__((noinline)) bios_read_secs(unsigned long lba, struct disk_address_packet* dap) {
+static int __noinline bios_read_secs(struct disk_address_packet* dap) {
     unsigned long eflags;
     asm volatile (
         "int $0x13\n\t" 

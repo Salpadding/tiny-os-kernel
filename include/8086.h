@@ -2,18 +2,42 @@
 #define __8086_H
 
 #include <io.h>
+#include <types.h>
 
 #define BOOT_ENTRY 0x7c00
 #define LOADER_ENTRY 0x500
-#define E820_MAP_ADDR 0x7e00
+#define LOADER_SECS 32
+#define KERNEL_SECS 896
+#define KERNEL_TMP 0x10000
+#define KERNEL_ENTRY 0x100000
 #define ALIGN_DESC 0x10
+#define SEC_SIZE 0x200
 
 #define SERIAL_PORT 0x3f8
 
 #define puts(s) serial_puts(s)
+
+// extern 声明的函数不会被 inline
+extern int  printk(const char* fmt, ...);
+extern int  printk_16(const char* fmt, ...);
+
 #define __INIT_CS 0x08
 #define __INIT_DS 0x10
 
+typedef char* va_list;
+#define __va_rounded_size(TYPE)  \
+  (((sizeof (TYPE) + sizeof (void*) - 1) / sizeof (void*)) * sizeof (void*))
+
+#define va_start(AP, LASTARG) 						\
+ (AP = ((char *) &(LASTARG) + __va_rounded_size (LASTARG)))
+
+#define va_end(va_list)
+
+#define va_arg(AP, TYPE)						\
+ (AP += __va_rounded_size (TYPE),					\
+  *((TYPE *) (AP - __va_rounded_size (TYPE))))
+
+extern int _text_end;
 static void cli() {
     asm volatile ("cli");
 }
@@ -42,22 +66,22 @@ static void __puts(const char*s) {
 );
 }
 
-#define __entry __attribute__((section ("entry")))
-#define __align(x) __attribute__( ( aligned(x) ) )
-#define __pack __attribute__((packed))
-#define __noinline __attribute__((noinline))
 
-typedef struct {
-    unsigned long lower;
-    unsigned long upper;
-} u64;
+static int strlen(const char * s)
+{
+    int __res;
+    int tmp;
+asm volatile ("cld\n\t"
+	"repne\n\t"
+	"scasb\n\t"
+	"notl %0\n\t"
+	"decl %0"
+	:"=c" (__res), "=D"(tmp): "1" (s),"a" (0),"0" (0xffffffff)
+	);
+return __res;
+}
 
-typedef u64 tb_desc_t;
 
-typedef struct {
-    unsigned short length;
-    void* addr;
-} __pack tb_ptr_t;
 
 
 extern void pm_start();
@@ -86,13 +110,11 @@ static void __noinline lba_read_secs (unsigned long lba, unsigned long count, ch
     }
 }
 
-
-#define RESET_SEG(seg) asm volatile( \
-    "mov %%ax, %%ds\n\t" \
-    "mov %%ax, %%es\n\t" \
-    "mov %%ax, %%fs\n\t" \
-    "mov %%ax, %%gs\n\t" \
-    "mov %%ax, %%ss\n\t" \
-    ::"a"(seg))
+static void __noinline memcpy(void* dst, void* src, unsigned long count) {
+    asm volatile (
+        "cld\n\t" 
+        "rep movsb\n\t" ::"D"(dst), "S"(src), "c"(count)
+    );
+}
 
 #endif

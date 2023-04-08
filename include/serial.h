@@ -1,6 +1,7 @@
 #ifndef __SERIAL_H
 #define __SERIAL_H
 
+#include <types.h>
 #include <io.h>
 
 #ifndef SERIAL_PORT
@@ -17,7 +18,7 @@
 
 #ifndef __ASM__
 
-static void serial_putc(char c) {
+static void __noinline serial_putc(char c) {
     unsigned int ax = 0 ; 
 
     while(!(ax & 0xff)) {

@@ -8,6 +8,7 @@ SECTIONS
  {
   *(entry);
   *(.text);
+  _text_end = . ;
  }
  .data : {
   *(.rodata*);

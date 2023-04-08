@@ -1,24 +1,36 @@
 CFLAGS := -I../include -fno-builtin -fno-stack-protector \
 		  -Os -fomit-frame-pointer \
-		  -ffreestanding -nostdinc -static \
-		  -fno-pic -fno-dwarf2-cfi-asm
+		  -ffreestanding -nostdinc \
+		  -fno-asynchronous-unwind-tables \
+		  -fno-pic -fno-dwarf2-cfi-asm -Wall 
+
+ifeq ($(SIM),QEMU)
+CFLAGS += -DSIM_QEMU
+endif
+
+all: install
 
 %.o: %.c
 	$(CC) -S $(CFLAGS) -m16  -o $*.s $<
 	$(AS) $(ASFLAGS) -o $@ $*.s
 
-all: install
-
-boot.bin: boot.o
-	ld -M -o boot.elf -T boot.lds $< > loader.map
-	objcopy -O binary boot.elf $@
-	
 pm.o: pm.c
 	$(CC) -S $(CFLAGS) -m32 -o $*.s $<
 	$(AS) $(ASFLAGS) -o $@ $*.s
 
-loader.bin: loader.o pm.o
-	ld -M -o loader.elf -e _start -T loader.lds $^ > loader.map
+prink.o: prink.c
+	$(CC) -S $(CFLAGS) -m32 -o $*.s $<
+	$(AS) $(ASFLAGS) -o $@ $*.s
+
+boot.bin: boot.o
+	ld -o boot.elf -T boot.lds $< 
+	nm boot.elf > boot.map
+	objcopy -O binary boot.elf $@
+	
+
+loader.bin: loader.o pm.o printk.o printk_16.o
+	ld -o loader.elf -e _start -T loader.lds $^
+	nm loader.elf > loader.map
 	objcopy -O binary loader.elf $@
 
 install: boot.bin loader.bin

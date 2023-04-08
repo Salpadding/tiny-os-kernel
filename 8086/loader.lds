@@ -6,6 +6,7 @@ SECTIONS
  .text : {
   *(entry);
   *(.text);
+  _text_end = . ;
  }
  .data : {
    *(.data);

@@ -1,10 +1,10 @@
-#romimage: file=$O/bochs/BIOS-bochs-latest
+romimage: file=/home/arch/bin/bochs_share/share/bochs/BIOS-bochs-latest
 megs: 128
-#vgaromimage: file=$OSLAB_PATH/bochs/VGABIOS-lgpl-latest
-floppya: 1_44="floppy.img", status=inserted
+vgaromimage: file=/home/arch/bin/bochs_share/share/bochs/VGABIOS-lgpl-latest
+#floppya: 1_44="disk.img", status=inserted
 ata0-master: type=disk, path="disk.img", mode=flat
 boot: disk
 cpu: count=1, ips=4000000
-display_library: sdl2
+display_library: nogui, options=hideIPS
 #display_library: x, options="gui_debug"
-com1: enabled=1, mode=file, dev=serial.txt
+com1: enabled=1, mode=file, dev=/dev/pts/3
